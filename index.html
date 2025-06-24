@@ -1,0 +1,2842 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dofus Touch Monster Tracker</title>
+    <!-- Bootstrap 5 CSS (removed xintegrity for better compatibility in iframe) -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Font Awesome for icons (removed xintegrity) -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css"
+        referrerpolicy="no-referrer">
+    <style>
+        /* Custom styles */
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap');
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f8f9fa;
+            /* Light background */
+            padding-top: 20px;
+            padding-bottom: 20px;
+        }
+
+        .monster-card {
+            border: 1px solid #dee2e6;
+            border-radius: 0.75rem;
+            /* Rounded corners for cards */
+            padding: 1rem;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.2s ease-in-out;
+            position: relative;
+            /* For overlay positioning */
+            overflow: hidden;
+            /* Ensure overlay respects border-radius */
+            box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            height: 100%;
+            /* Make cards same height in grid */
+        }
+
+        .monster-card:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15);
+        }
+
+        .monster-card img {
+            max-width: 100px;
+            height: 100px;
+            object-fit: contain;
+            margin: 0 auto 0.75rem auto;
+            /* Center image and add spacing */
+            border-radius: 0.5rem;
+            background-color: #e9ecef;
+            /* Light grey background for image area */
+        }
+
+        .monster-card .name {
+            font-weight: 600;
+            color: #343a40;
+            font-size: 0.9rem;
+            /* Slightly smaller font for names */
+            flex-grow: 1;
+            /* Allow name to take available space */
+            display: flex;
+            /* Use flexbox for text to apply line-clamp */
+            align-items: center;
+            /* Vertically center name */
+            justify-content: center;
+            /* Horizontally center name */
+            min-height: 2.5em;
+            /* Ensure consistent height for names, preventing CLS */
+        }
+
+        /* Green overlay for captured monsters */
+        .monster-card.captured {
+            border-color: #28a745;
+            /* Green border */
+            background-color: rgba(40, 167, 69, 0.1);
+            /* Light green background */
+        }
+
+        .monster-card.captured::after {
+            content: '\f00c';
+            /* Font Awesome checkmark icon */
+            font-family: 'Font Awesome 6 Free';
+            /* Use Font Awesome font */
+            font-weight: 900;
+            /* Solid icon style */
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            color: #28a745;
+            /* Green color for checkmark */
+            font-size: 3rem;
+            /* Large checkmark */
+            opacity: 0.7;
+            pointer-events: none;
+            /* Allow clicks to pass through */
+            text-shadow: 1px 1px 3px rgba(0, 0, 0, 0.2);
+        }
+
+        /* Adjustments for accordion header */
+        .accordion-button {
+            background-color: #e0f7fa;
+            /* Light blue */
+            color: #007bff;
+            /* Blue text */
+            font-weight: 700;
+            font-size: 1.25rem;
+            border-radius: 0.75rem !important;
+            /* Match overall card rounding */
+            position: relative;
+            /* For positioning checkbox */
+            padding-right: 5rem;
+            /* Make space for the checkbox */
+        }
+
+        .accordion-button:not(.collapsed) {
+            background-color: #007bff;
+            /* Darker blue when open */
+            color: white;
+            box-shadow: inset 0 -1px 0 rgba(0, 0, 0, 0.125);
+            border-bottom-left-radius: 0 !important;
+            border-bottom-right-radius: 0 !important;
+        }
+
+        .accordion-item {
+            border-radius: 0.75rem;
+            overflow: hidden;
+            /* Ensures internal elements conform to border-radius */
+            margin-bottom: 1rem;
+            /* Spacing between accordion items */
+        }
+
+        .accordion-body {
+            background-color: #fff;
+            border-top: 1px solid #dee2e6;
+            border-bottom-left-radius: 0.75rem;
+            border-bottom-right-radius: 0.75rem;
+        }
+
+        /* Custom switch for the etapa toggle */
+        .form-check.form-switch.etapa-toggle-switch {
+            position: absolute;
+            right: 1.5rem;
+            top: 50%;
+            transform: translateY(-50%);
+            z-index: 2;
+            /* Ensure it's clickable above the button */
+        }
+
+        .form-check-input.etapa-toggle-input {
+            cursor: pointer;
+            width: 3em;
+            /* Larger switch */
+            height: 1.5em;
+            margin-top: 0;
+            background-color: rgba(255, 255, 255, 0.5);
+            /* Semi-transparent white */
+            border-color: rgba(255, 255, 255, 0.7);
+        }
+
+        .accordion-button:not(.collapsed) .form-check-input.etapa-toggle-input {
+            background-color: rgba(255, 255, 255, 0.7);
+            /* Slightly more opaque when expanded */
+            border-color: rgba(255, 255, 255, 0.9);
+        }
+
+        .form-check-input.etapa-toggle-input:checked {
+            background-color: #28a745;
+            /* Green when checked */
+            border-color: #28a745;
+        }
+
+
+        /* Scrollbar styles for webkit browsers */
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: #f1f1f1;
+            border-radius: 10px;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: #888;
+            border-radius: 10px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: #555;
+        }
+    </style>
+</head>
+
+<body>
+
+    <div class="container py-4">
+        <h1 class="text-center mb-5 text-primary fw-bold">Dofus Touch Monster Tracker</h1>
+
+        <!-- Search Bar -->
+        <div class="input-group mb-2 shadow-sm rounded-pill overflow-hidden">
+            <input type="text" id="searchTerm" class="form-control form-control-lg border-0 ps-4 py-3"
+                placeholder="Buscar monstruo..." aria-label="Search monster by name">
+            <span class="input-group-text bg-white border-0 pe-4">
+                <i class="fa-solid fa-magnifying-glass text-muted"></i>
+            </span>
+        </div>
+
+        <!-- Captured Monsters Counter -->
+        <p id="capturedCounter" class="text-center text-muted mb-4"></p>
+
+        <!-- Accordion for Etapas -->
+        <div class="accordion" id="monsterAccordion">
+            <!-- Accordion items will be rendered here by JavaScript -->
+        </div>
+    </div>
+
+    <!-- Bootstrap 5 JS (removed xintegrity) -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+
+    <script>
+        const initialData = {
+            '1': [
+                {
+                    name: 'Ratón gris',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/126.w200h.png'
+                },
+                {
+                    name: 'Moskito',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/61.w200h.png'
+                },
+                {
+                    name: 'Arakna',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/52.w200h.png'
+                },
+                {
+                    name: 'Jalatín blanco',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/134.w200h.png'
+                },
+                {
+                    name: 'Jalatín negro',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/149.w200h.png'
+                },
+                {
+                    name: 'Tofu maléfico',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/111.w200h.png'
+                },
+                {
+                    name: 'Arakna enferma',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/474.w200h.png'
+                },
+                {
+                    name: 'Pío azul',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/491.w200h.png'
+                },
+                {
+                    name: 'Pío amarillo',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/493.w200h.png'
+                },
+                {
+                    name: 'Pío rojo',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/489.w200h.png'
+                },
+                {
+                    name: 'Pío verde',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/490.w200h.png'
+                },
+                {
+                    name: 'Pío violeta',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/236.w200h.png'
+                },
+                {
+                    name: 'Llamita aire',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/245.w200h.png'
+                },
+                {
+                    name: 'Llamita agua',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/243.w200h.png'
+                },
+                {
+                    name: 'Llamita fuego',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/242.w200h.png'
+                },
+                {
+                    name: 'Llamita tierra',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/244.w200h.png'
+                },
+                {
+                    name: 'Larva azul',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/31.w200h.png'
+                },
+                {
+                    name: 'Cangrejo',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/63.w200h.png'
+                },
+                {
+                    name: 'Pío rosa',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/492.w200h.png'
+                },
+                {
+                    name: 'Tofu',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/98.w200h.png'
+                }
+            ],
+            '2': [
+                {
+                    name: 'Tofu enfermo',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/473.w200h.png'
+                },
+                {
+                    name: 'Champi champ',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/59.w200h.png'
+                },
+                {
+                    name: 'Diente de león diabólico',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/79.w200h.png'
+                },
+                {
+                    name: 'Arakna agresiva',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/255.w200h.png'
+                },
+                {
+                    name: 'Bandido manco',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/466.w200h.png'
+                },
+                {
+                    name: 'Rosa demoníaca',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/78.w200h.png'
+                },
+                {
+                    name: 'Gelatina azul',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/55.w200h.png'
+                },
+                {
+                    name: 'Kwoan',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/154.w200h.png'
+                },
+                {
+                    name: 'Larva verde',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/34.w200h.png'
+                },
+                {
+                    name: 'Jalató',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/101.w200h.png'
+                },
+                {
+                    name: 'Kólerat',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/300.w200h.png'
+                },
+                {
+                    name: 'Gelatina de menta',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/56.w200h.png'
+                },
+                {
+                    name: 'Larva naranja',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/46.w200h.png'
+                },
+                {
+                    name: 'Panadero oscuro',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/153.w200h.png'
+                },
+                {
+                    name: 'Black pekewabbit',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/68.w200h.png'
+                },
+                {
+                    name: 'Pekewabbit',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/96.w200h.png'
+                },
+                {
+                    name: 'Pekewabbit hambriento',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/72.w200h.png'
+                },
+                {
+                    name: 'Girasol salvaje',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/48.w200h.png'
+                },
+                {
+                    name: 'Bandido del clan de los tymadores',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/155.w200h.png'
+                },
+                {
+                    name: 'Goblin',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/178.w200h.png'
+                }
+            ],
+            '3': [
+                {
+                    name: 'Nozdekoko',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/218.w200h.png'
+                },
+                {
+                    name: 'Pekekoko',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/208.w200h.png'
+                },
+                {
+                    name: 'Kosakepega',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/215.w200h.png'
+                },
+                {
+                    name: 'Jabalí',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/104.w200h.png'
+                },
+                {
+                    name: 'Champo verde',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/652.w200h.png'
+                },
+                {
+                    name: 'Gargántula',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/4316.w200h.png'
+                },
+                {
+                    name: 'Vampiro',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/127.w200h.png'
+                },
+                {
+                    name: 'Biblop coco',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/278.w200h.png'
+                },
+                {
+                    name: 'Biblop guinda',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/279.w200h.png'
+                },
+                {
+                    name: 'Biblop índigo',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/277.w200h.png'
+                },
+                {
+                    name: 'Biblop reineta',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/280.w200h.png'
+                },
+                {
+                    name: 'Cabalgador de karne',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/62.w200h.png'
+                },
+                {
+                    name: 'Aprendiz ratamán',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/475.w200h.png'
+                },
+                {
+                    name: 'Boo',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/112.w200h.png'
+                },
+                {
+                    name: 'Prespic',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/103.w200h.png'
+                },
+                {
+                    name: 'Cochinillo',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/123.w200h.png'
+                },
+                {
+                    name: 'Tortuga amarilla',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/223.w200h.png'
+                },
+                {
+                    name: 'Wabbit',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/64.w200h.png'
+                },
+                {
+                    name: 'Jefe de guerra jalató',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/148.w200h.png'
+                },
+                {
+                    name: 'Pastor puerkazo',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/344.w200h.png'
+                }
+            ],
+            '4': [
+                {
+                    name: 'Colmillo blando',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/299.w200h.png'
+                },
+                {
+                    name: 'Tortuga azul',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/221.w200h.png'
+                },
+                {
+                    name: 'Cuerbok',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/281.w200h.png'
+                },
+                {
+                    name: 'Estrella del mar Rano',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/927.w200h.png'
+                },
+                {
+                    name: 'Pischis blanco',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/922.w200h.png'
+                },
+                {
+                    name: 'Pischis azul',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/921.w200h.png'
+                },
+                {
+                    name: 'Pischis naranja',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/920.w200h.png'
+                },
+                {
+                    name: 'Pischis verde',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/923.w200h.png'
+                },
+                {
+                    name: 'Tortuga roja',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/220.w200h.png'
+                },
+                {
+                    name: 'Vampiro jefe',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/124.w200h.png'
+                },
+                {
+                    name: 'Minoskito',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/834.w200h.png'
+                },
+                {
+                    name: 'Araquesalta',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/4310.w200h.png'
+                },
+                {
+                    name: 'Minilubo Albino',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/159.w200h.png'
+                },
+                {
+                    name: 'Mazorral',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/217.w200h.png'
+                },
+                {
+                    name: 'Tortuga verde',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/222.w200h.png'
+                },
+                {
+                    name: 'Bwork mago',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/53.w200h.png'
+                },
+                {
+                    name: 'Colmillo blando rabioso',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/397.w200h.png'
+                }
+            ],
+            '5': [
+                {
+                    name: 'Rosa oscura',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/467.w200h.png'
+                },
+                {
+                    name: 'Black wabbit',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/65.w200h.png'
+                },
+                {
+                    name: 'Minero oscuro',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/118.w200h.png'
+                },
+                {
+                    name: 'Bwork arquero',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/74.w200h.png'
+                },
+                {
+                    name: 'Champo azul',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/654.w200h.png'
+                },
+                {
+                    name: 'Champo marrón',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/655.w200h.png'
+                },
+                {
+                    name: 'Champo rojo',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/653.w200h.png'
+                },
+                {
+                    name: 'Crujibola',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/483.w200h.png'
+                },
+                {
+                    name: 'Mandrina',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/835.w200h.png'
+                },
+                {
+                    name: 'Gárgrola',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/498.w200h.png'
+                },
+                {
+                    name: 'Dragopavo almendrado y salvaje',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/171.w200h.png'
+                },
+                {
+                    name: 'Gelatina de fresa',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/57.w200h.png'
+                },
+                {
+                    name: 'Wabbit esqueleto',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/179.w200h.png'
+                },
+                {
+                    name: 'Chafer invisible',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/110.w200h.png'
+                },
+                {
+                    name: 'Crujidor',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/106.w200h.png'
+                },
+                {
+                    name: 'Bwork',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/876.w200h.png'
+                },
+                {
+                    name: 'Abráknido',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/47.w200h.png'
+                },
+                {
+                    name: 'Krameleón',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/836.w200h.png'
+                }
+            ],
+            '6': [
+                {
+                    name: 'Escarahoja blanco',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/241.w200h.png'
+                },
+                {
+                    name: 'Escarahoja azul',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/198.w200h.png'
+                },
+                {
+                    name: 'Escarahoja rojo',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/194.w200h.png'
+                },
+                {
+                    name: 'Escarahoja verde',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/240.w200h.png'
+                },
+                {
+                    name: 'Rib',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/108.w200h.png'
+                },
+                {
+                    name: 'Blop coco',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/273.w200h.png'
+                },
+                {
+                    name: 'Blop guinda',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/275.w200h.png'
+                },
+                {
+                    name: 'Blop índigo',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/274.w200h.png'
+                },
+                {
+                    name: 'Blop reineta',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/276.w200h.png'
+                },
+                {
+                    name: 'Cerdo de Farle',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/603.w200h.png'
+                },
+                {
+                    name: 'Escarato',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/830.w200h.png'
+                },
+                {
+                    name: 'Boomba',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/228.w200h.png'
+                },
+                {
+                    name: 'Tronkónido',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/256.w200h.png'
+                },
+                {
+                    name: 'Chafer infante',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/396.w200h.png'
+                },
+                {
+                    name: 'Pischis payaso',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/924.w200h.png'
+                },
+                {
+                    name: 'Abrakno',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/650.w200h.png'
+                },
+                {
+                    name: 'Chafer',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/54.w200h.png'
+                },
+                {
+                    name: 'Cocodrail',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/261.w200h.png'
+                },
+                {
+                    name: 'Rata de alcantarilla enferma',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/465.w200h.png'
+                },
+                {
+                    name: 'Scorbuto',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/298.w200h.png'
+                }
+            ],
+            '7': [
+                {
+                    name: 'Dragopavo pelirrojo y salvaje',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/200.w200h.png'
+                },
+                {
+                    name: 'Herrero oscuro',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/119.w200h.png'
+                },
+                {
+                    name: 'Crustoral kuraçao',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/1060.w200h.png'
+                },
+                {
+                    name: 'Crustoral malibut',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/1061.w200h.png'
+                },
+                {
+                    name: 'Crustoral mohito',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/1063.w200h.png'
+                },
+                {
+                    name: 'Crustoral passaoh',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/1062.w200h.png'
+                },
+                {
+                    name: 'Arakna mayor',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/259.w200h.png'
+                },
+                {
+                    name: 'Awelito wabbit',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/99.w200h.png'
+                },
+                {
+                    name: 'Wabbit wodo',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/97.w200h.png'
+                },
+                {
+                    name: 'Caballero puerkazo',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/343.w200h.png'
+                },
+                {
+                    name: 'Abub',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/384.w200h.png'
+                },
+                {
+                    name: 'Amlub',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/385.w200h.png'
+                },
+                {
+                    name: 'Codem',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/386.w200h.png'
+                },
+                {
+                    name: 'Gink',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/387.w200h.png'
+                },
+                {
+                    name: 'Kirevam',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/388.w200h.png'
+                },
+                {
+                    name: 'Let emoliug',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/389.w200h.png'
+                },
+                {
+                    name: 'Nebgib',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/390.w200h.png'
+                },
+                {
+                    name: 'Nipul',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/391.w200h.png'
+                }
+            ],
+            '8': [
+                {
+                    name: 'Osurc',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/392.w200h.png'
+                },
+                {
+                    name: 'Susej',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/393.w200h.png'
+                },
+                {
+                    name: 'Kokoko',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/209.w200h.png'
+                },
+                {
+                    name: 'Chafer arquero',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/291.w200h.png'
+                },
+                {
+                    name: 'Chafer lancero',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/290.w200h.png'
+                },
+                {
+                    name: 'Dok Alako',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/747.w200h.png'
+                },
+                {
+                    name: 'Koalak inmaduro',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/748.w200h.png'
+                },
+                {
+                    name: 'Minovillo',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/668.w200h.png'
+                },
+                {
+                    name: 'Chamán de alcantarilla',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/447.w200h.png'
+                },
+                {
+                    name: 'Stropajo turbado',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/1096.w200h.png'
+                },
+                {
+                    name: 'La stropajo',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/495.w200h.png'
+                },
+                {
+                    name: 'El stropajo',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/496.w200h.png'
+                },
+                {
+                    name: 'Palmiflor malibut',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/1065.w200h.png'
+                },
+                {
+                    name: 'Palmiflor mohito',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/1067.w200h.png'
+                },
+                {
+                    name: 'Palmiflor passaoh',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/1066.w200h.png'
+                },
+                {
+                    name: 'Jabalí de las llanuras',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/297.w200h.png'
+                },
+                {
+                    name: 'Abráknido venerable',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/254.w200h.png'
+                },
+                {
+                    name: 'Crujidor de las llanuras',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/293.w200h.png'
+                },
+                {
+                    name: 'Chafer de élite',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/292.w200h.png'
+                }
+            ],
+            '9': [
+                {
+                    name: 'Maestro boletus',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/371.w200h.png'
+                },
+                {
+                    name: 'Crujibola pulío',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/1026.w200h.png'
+                },
+                {
+                    name: 'Kaníbola arquero',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/211.w200h.png'
+                },
+                {
+                    name: 'Kaníbola jav',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/213.w200h.png'
+                },
+                {
+                    name: 'Kaníbola cerbat',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/214.w200h.png'
+                },
+                {
+                    name: 'Kaníbola thierry',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/212.w200h.png'
+                },
+                {
+                    name: 'Rata de alcantarilla',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/442.w200h.png'
+                },
+                {
+                    name: 'Palmiflor kuraçao',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/1064.w200h.png'
+                },
+                {
+                    name: 'Uginak',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/301.w200h.png'
+                },
+                {
+                    name: 'Dragohuevo blanco inmaduro',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/90.w200h.png'
+                },
+                {
+                    name: 'Dragohuevo dorado inmaduro',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/75.w200h.png'
+                },
+                {
+                    name: 'Dragohuevo negro inmaduro',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/82.w200h.png'
+                },
+                {
+                    name: 'Dragohuevo zafiro inmaduro',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/170.w200h.png'
+                },
+                {
+                    name: 'Dragoss blanco',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/885.w200h.png'
+                },
+                {
+                    name: 'Dragoss dorado',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/886.w200h.png'
+                },
+                {
+                    name: 'Dragoss negro',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/848.w200h.png'
+                },
+                {
+                    name: 'Dragoss zafiro',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/884.w200h.png'
+                }
+            ],
+            '10': [
+                {
+                    name: 'Serpipluma',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/829.w200h.png'
+                },
+                {
+                    name: 'Coralador',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/1022.w200h.png'
+                },
+                {
+                    name: 'Raúl Mops',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/926.w200h.png'
+                },
+                {
+                    name: 'Cáscara explosiva',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/158.w200h.png'
+                },
+                {
+                    name: 'Cañón dorf',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/231.w200h.png'
+                },
+                {
+                    name: 'Nakumbra',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/229.w200h.png'
+                },
+                {
+                    name: 'Don dessangre',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/600.w200h.png'
+                },
+                {
+                    name: 'Dragohuevo blanco',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/76.w200h.png'
+                },
+                {
+                    name: 'Dragohuevo dorado',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/87.w200h.png'
+                },
+                {
+                    name: 'Dragohuevo negro',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/89.w200h.png'
+                },
+                {
+                    name: 'Dragohuevo zafiro',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/88.w200h.png'
+                },
+                {
+                    name: 'Koalak coco',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/752.w200h.png'
+                },
+                {
+                    name: 'Koalak guinda',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/753.w200h.png'
+                },
+                {
+                    name: 'Koalak índigo',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/751.w200h.png'
+                },
+                {
+                    name: 'Koalak reineta',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/754.w200h.png'
+                },
+                {
+                    name: 'Rata hyoactiva',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/449.w200h.png'
+                },
+                {
+                    name: 'Sparo',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/1048.w200h.png'
+                }
+            ],
+            '11': [
+                {
+                    name: 'Marguerrita',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/1076.w200h.png'
+                },
+                {
+                    name: 'Fantasma de aperitubo',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/932.w200h.png'
+                },
+                {
+                    name: 'Fantasma ardiente',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/378.w200h.png'
+                },
+                {
+                    name: 'Fantasma sesino',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/380.w200h.png'
+                },
+                {
+                    name: 'Fantasma valiente',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/379.w200h.png'
+                },
+                {
+                    name: 'Don dórgano',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/601.w200h.png'
+                },
+                {
+                    name: 'Barbrusa',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/1049.w200h.png'
+                },
+                {
+                    name: 'Flib',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/1050.w200h.png'
+                },
+                {
+                    name: 'Nierba',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/1074.w200h.png'
+                },
+                {
+                    name: 'Jefe cocodrail',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/263.w200h.png'
+                },
+                {
+                    name: 'Larva campestre',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/3898.w200h.png'
+                },
+                {
+                    name: 'Kanugro',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/287.w200h.png'
+                },
+                {
+                    name: 'Tufo de las llanuras',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/1019.w200h.png'
+                },
+                {
+                    name: 'Crujidor pulío',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/1025.w200h.png'
+                },
+                {
+                    name: 'Mufafah',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/1068.w200h.png'
+                },
+                {
+                    name: 'Mediulubo',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/102.w200h.png'
+                },
+                {
+                    name: 'Kido',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/1069.w200h.png'
+                },
+                {
+                    name: 'Kilibris',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/1070.w200h.png'
+                },
+                {
+                    name: 'Dragohuevo blanco despierto',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/93.w200h.png'
+                }
+            ],
+            '12': [
+                {
+                    name: 'Dragohuevo dorado despierto',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/94.w200h.png'
+                },
+                {
+                    name: 'Dragohuevo negro despierto',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/91.w200h.png'
+                },
+                {
+                    name: 'Dragohuevo zafiro despierto',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/95.w200h.png'
+                },
+                {
+                    name: 'Dragosa',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/855.w200h.png'
+                },
+                {
+                    name: 'Guerrero koalak',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/749.w200h.png'
+                },
+                {
+                    name: 'Arakmutada',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/4314.w200h.png'
+                },
+                {
+                    name: 'Warko marrón',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/746.w200h.png'
+                },
+                {
+                    name: 'Abráknido oscuro',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/253.w200h.png'
+                },
+                {
+                    name: 'Koalak sepulturero',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/761.w200h.png'
+                },
+                {
+                    name: 'Koalak forestal',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/785.w200h.png'
+                },
+                {
+                    name: 'Piralak',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/784.w200h.png'
+                },
+                {
+                    name: 'Pekewalak',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/786.w200h.png'
+                },
+                {
+                    name: 'Zampávoro',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/216.w200h.png'
+                },
+                {
+                    name: 'Abrakno oscuro',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/651.w200h.png'
+                },
+                {
+                    name: 'Dragopavo dorado y salvaje',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/666.w200h.png'
+                },
+                {
+                    name: 'Koalak cabalgador',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/759.w200h.png'
+                },
+                {
+                    name: 'Mopet',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/1046.w200h.png'
+                }
+            ],
+            '13': [
+                {
+                    name: 'Dragohuevo guerrero',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/853.w200h.png'
+                },
+                {
+                    name: 'Dragohuevo volador',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/862.w200h.png'
+                },
+                {
+                    name: 'Aerohuctor, el Guerrero',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/894.w200h.png'
+                },
+                {
+                    name: 'Aquabralak, el Guerrero',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/895.w200h.png'
+                },
+                {
+                    name: 'Ignelicrobur, el Guerrero',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/893.w200h.png'
+                },
+                {
+                    name: 'Terrakubiack, el Guerrero',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/892.w200h.png'
+                },
+                {
+                    name: 'Discípulo zoth',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/1055.w200h.png'
+                },
+                {
+                    name: 'Esquejika',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/1073.w200h.png'
+                },
+                {
+                    name: 'Koalak sanguíneo',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/744.w200h.png'
+                },
+                {
+                    name: 'Tufo oscuro',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/1041.w200h.png'
+                },
+                {
+                    name: 'Floribundo',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/1029.w200h.png'
+                },
+                {
+                    name: 'Diente pe-león',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/1075.w200h.png'
+                },
+                {
+                    name: 'Koalak salvaje',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/756.w200h.png'
+                },
+                {
+                    name: 'Mamá koalak',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/755.w200h.png'
+                },
+                {
+                    name: 'Momia koalak',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/760.w200h.png'
+                },
+                {
+                    name: 'Lodostropajo',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/1059.w200h.png'
+                },
+                {
+                    name: 'Warko Violeta',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/745.w200h.png'
+                },
+                {
+                    name: 'Chavala zoth',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/1053.w200h.png'
+                },
+                {
+                    name: 'Guerrero zoth',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/1054.w200h.png'
+                }
+            ],
+            '14': [
+                {
+                    name: 'Barrostropajo',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/1058.w200h.png'
+                },
+                {
+                    name: 'Abrajidor oscuro',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/1077.w200h.png'
+                },
+                {
+                    name: 'Dragoss blanco despierto',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/878.w200h.png'
+                },
+                {
+                    name: 'Dragoss dorado despierto',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/879.w200h.png'
+                },
+                {
+                    name: 'Dragoss negro despierto',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/858.w200h.png'
+                },
+                {
+                    name: 'Dragoss zafiro despierto',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/905.w200h.png'
+                },
+                {
+                    name: 'Drakoalak',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/763.w200h.png'
+                },
+                {
+                    name: 'Siegalak',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/783.w200h.png'
+                },
+                {
+                    name: 'Maestro koalak',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/758.w200h.png'
+                },
+                {
+                    name: 'Pohoyo',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/1043.w200h.png'
+                },
+                {
+                    name: 'Ignirkocropos, el Hambriento',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/902.w200h.png'
+                },
+                {
+                    name: 'Terraburkal, el Pérfido',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/903.w200h.png'
+                },
+                {
+                    name: 'Aerotrugobur, el Malvado',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/904.w200h.png'
+                },
+                {
+                    name: 'Aqualikros, el Despiadado',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/877.w200h.png'
+                },
+                {
+                    name: 'Trooll',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/233.w200h.png'
+                },
+                {
+                    name: 'Arapúas',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/4320.w200h.png'
+                },
+                {
+                    name: 'Arápex',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/4322.w200h.png'
+                }
+            ],
+            '15': [
+                {
+                    name: 'Sargento zoth',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/1056.w200h.png'
+                },
+                {
+                    name: 'Kasrakol',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/1044.w200h.png'
+                },
+                {
+                    name: 'Tufo aéreo',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/1020.w200h.png'
+                },
+                {
+                    name: 'Abrajidor claro',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/1047.w200h.png'
+                },
+                {
+                    name: 'Maestro zoth',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/1052.w200h.png'
+                },
+                {
+                    name: 'Champáknido',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/1154.w200h.png'
+                },
+                {
+                    name: 'Trompseta',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/1153.w200h.png'
+                },
+                {
+                    name: 'Champidonte',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/1155.w200h.png'
+                },
+                {
+                    name: 'Onirakam',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/4405.w200h.png'
+                },
+                {
+                    name: 'Yukisamara',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/4403.w200h.png'
+                },
+                {
+                    name: 'Champbis',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/1157.w200h.png'
+                },
+                {
+                    name: 'Seta peleona',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/1158.w200h.png'
+                },
+                {
+                    name: 'Setador',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/1156.w200h.png'
+                },
+                {
+                    name: 'Kaeneko',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/4401.w200h.png'
+                },
+                {
+                    name: 'Rey stropajo',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/1057.w200h.png'
+                }
+            ],
+            '16': [
+                {
+                    name: 'Kaonashi',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/4407.w200h.png'
+                },
+                {
+                    name: 'Majaro',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/4409.w200h.png'
+                }
+            ],
+            '17': [
+                {
+                    name: 'Mob Lasponja',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/928.w200h.png'
+                },
+                {
+                    name: 'Jalató Real',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/147.w200h.png'
+                },
+                {
+                    name: 'Girasol Hambriento',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/799.w200h.png'
+                },
+                {
+                    name: 'Gelatina Real Azul',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/58.w200h.png'
+                },
+                {
+                    name: 'Shin Larva',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/457.w200h.png'
+                },
+                {
+                    name: 'Wabbit GM',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/182.w200h.png'
+                },
+                {
+                    name: 'Escarajefe Dorado',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/797.w200h.png'
+                },
+                {
+                    name: 'Bworka',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/792.w200h.png'
+                },
+                {
+                    name: 'Dragocerdo',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/113.w200h.png'
+                },
+                {
+                    name: 'Mominotauro',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/831.w200h.png'
+                },
+                {
+                    name: 'Deminobola',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/832.w200h.png'
+                },
+                {
+                    name: 'Gelatina Real de Menta',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/85.w200h.png'
+                },
+                {
+                    name: 'Tofu Real',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/382.w200h.png'
+                },
+                {
+                    name: 'Blop Coco Real',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/1184.w200h.png'
+                },
+                {
+                    name: 'Blop Guinda Real',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/1185.w200h.png'
+                },
+                {
+                    name: 'Blop Índigo Real',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/1186.w200h.png'
+                },
+                {
+                    name: 'Blop Reineta Real',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/1187.w200h.png'
+                },
+                {
+                    name: 'Rata Negra',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/939.w200h.png'
+                },
+                {
+                    name: 'Rata Blanca',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/940.w200h.png'
+                },
+                {
+                    name: 'Minotauroro',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/121.w200h.png'
+                }
+            ],
+            '18': [
+                {
+                    name: 'Hell Mina',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/4318.w200h.png'
+                },
+                {
+                    name: 'Crujidor Legendario',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/669.w200h.png'
+                },
+                {
+                    name: 'Guardiana de alcantarilla',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/450.w200h.png'
+                },
+                {
+                    name: 'Gelatina Real de Fresa',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/86.w200h.png'
+                },
+                {
+                    name: 'Maestro Cuerbok',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/289.w200h.png'
+                },
+                {
+                    name: 'Blop Multicolor Real',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/1188.w200h.png'
+                },
+                {
+                    name: 'Coralador Magistral',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/1027.w200h.png'
+                },
+                {
+                    name: 'Gurlo, el Terrible',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/1051.w200h.png'
+                },
+                {
+                    name: 'Maxilubo',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/232.w200h.png'
+                },
+                {
+                    name: 'Wey Wabbit',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/180.w200h.png'
+                },
+                {
+                    name: 'Moon',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/226.w200h.png'
+                },
+                {
+                    name: 'Trankitronko',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/670.w200h.png'
+                },
+                {
+                    name: 'Skonk',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/780.w200h.png'
+                },
+                {
+                    name: 'Abráknido Ancestral',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/173.w200h.png'
+                },
+                {
+                    name: 'Tynril Atónito',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/1087.w200h.png'
+                },
+                {
+                    name: 'Tynril Estupefacto',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/1072.w200h.png'
+                },
+                {
+                    name: 'Tynril Absorto',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/1085.w200h.png'
+                },
+                {
+                    name: 'Tynril Pérfido',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/1086.w200h.png'
+                }
+            ],
+            '19': [
+                {
+                    name: 'Gelatina Real de Limón',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/430.w200h.png'
+                },
+                {
+                    name: 'Bworker',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/478.w200h.png'
+                },
+                {
+                    name: 'Sfinter Cell',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/943.w200h.png'
+                },
+                {
+                    name: 'Minotot',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/827.w200h.png'
+                },
+                {
+                    name: 'Silf, el Rasgabola Mayor',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/1071.w200h.png'
+                },
+                {
+                    name: 'Cocabulia',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/854.w200h.png'
+                },
+                {
+                    name: 'Roble Blando',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/257.w200h.png'
+                },
+                {
+                    name: 'Ugah',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/1159.w200h.png'
+                },
+                {
+                    name: 'Kimbo',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/1045.w200h.png'
+                }
+            ],
+            '20': [
+                {
+                    name: 'Ratom Raider, la Curvas',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/2354.w200h.png'
+                },
+                {
+                    name: 'Mashkira, la Rubia de Bote',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/2336.w200h.png'
+                },
+                {
+                    name: 'Arakniry, la destripada',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/2310.w200h.png'
+                },
+                {
+                    name: 'Jalatintin, el Reportero',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/2315.w200h.png'
+                },
+                {
+                    name: 'Jalatintanic, el Hundido',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/2316.w200h.png'
+                },
+                {
+                    name: 'Tofumantxú, el Mítico',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/2357.w200h.png'
+                },
+                {
+                    name: 'Arkandinska, la Lírica',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/2312.w200h.png'
+                },
+                {
+                    name: 'Pioch, el Arenil',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/2341.w200h.png'
+                },
+                {
+                    name: 'Piokacho, el Eléctrico',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/2342.w200h.png'
+                },
+                {
+                    name: 'Capioricito Rojo, el Forestal',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/2344.w200h.png'
+                },
+                {
+                    name: 'Spionter Vellde, el Peligroso',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/2345.w200h.png'
+                },
+                {
+                    name: 'Spío, el Dragón',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/2347.w200h.png'
+                },
+                {
+                    name: 'Cangri-doo, la Hadada',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/2327.w200h.png'
+                },
+                {
+                    name: 'Larvichuelas Jack, las Mágicas',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/2574.w200h.png'
+                },
+                {
+                    name: 'Pido, el Greñas',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/2343.w200h.png'
+                },
+                {
+                    name: 'Satofu, el PlasticPaddy',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/2355.w200h.png'
+                },
+                {
+                    name: 'Tofumado, el Alucinado',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/2356.w200h.png'
+                },
+                {
+                    name: 'Champi Casso, el Cúbico',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/2323.w200h.png'
+                },
+                {
+                    name: 'Diente de Lennon, el Universal',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/2348.w200h.png'
+                },
+                {
+                    name: 'Araknekros, el Salvaje',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/2393.w200h.png'
+                }
+            ],
+            '21': [
+                {
+                    name: 'Banrí Mantís, el Pigmentado',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/2313.w200h.png'
+                },
+                {
+                    name: 'Rochavo Democho, el Chispotiado',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/2352.w200h.png'
+                },
+                {
+                    name: 'Gelatiris, el Arenero',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/2487.w200h.png'
+                },
+                {
+                    name: 'Kwane, el Ciudadano',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/2522.w200h.png'
+                },
+                {
+                    name: 'Larvémming, el Descerebrado',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/2332.w200h.png'
+                },
+                {
+                    name: 'Jaleté, el Extraterrestre',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/2317.w200h.png'
+                },
+                {
+                    name: 'Kolafuerte, el Pegatodo',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/2520.w200h.png'
+                },
+                {
+                    name: 'Gelazquina, el Men',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/2371.w200h.png'
+                },
+                {
+                    name: 'Larvangoj, el Desorejado',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/2331.w200h.png'
+                },
+                {
+                    name: 'Zumburdieu el Social',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/2286.w200h.png'
+                },
+                {
+                    name: 'Black Tegerwoddit, el Swinguero',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/2402.w200h.png'
+                },
+                {
+                    name: 'Paelladero Oscuro, el Arrozoso',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/2318.w200h.png'
+                },
+                {
+                    name: 'Pekewasqhabit, el Juguetón',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/2293.w200h.png'
+                },
+                {
+                    name: 'Pekiwbyt Hambriento, el Glotón',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/2294.w200h.png'
+                },
+                {
+                    name: 'Gearsol Metalvaje, el Espía',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/2358.w200h.png'
+                },
+                {
+                    name: 'Bandiras, el zorro del clan Los Malagueños',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/2314.w200h.png'
+                },
+                {
+                    name: 'Goyablín, el Afrancesado',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/2494.w200h.png'
+                },
+                {
+                    name: 'Nozdoku, el Numérico',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/2541.w200h.png'
+                },
+                {
+                    name: 'Granfortote el Contramaestre',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/2292.w200h.png'
+                },
+                {
+                    name: 'Kosakhiin, el Lunítico',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/2301.w200h.png'
+                }
+            ],
+            '22': [
+                {
+                    name: 'Jabachlí, el Casto',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/2353.w200h.png'
+                },
+                {
+                    name: 'Champolís, el Astronauta',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/2427.w200h.png'
+                },
+                {
+                    name: 'Gargantúa la Devoradora',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/4350.w200h.png'
+                },
+                {
+                    name: 'Vamorespirros, el Múltiple',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/2302.w200h.png'
+                },
+                {
+                    name: 'Bibolsón, el Anilloso',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/2399.w200h.png'
+                },
+                {
+                    name: 'Biblidiana, la Controvertida',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/2400.w200h.png'
+                },
+                {
+                    name: 'Biblues, el Ritmo',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/2396.w200h.png'
+                },
+                {
+                    name: 'Biblópera, el Fantasma',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/2401.w200h.png'
+                },
+                {
+                    name: 'Cabalista el Conspirador',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/2430.w200h.png'
+                },
+                {
+                    name: 'Ratatouille el cocinero',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/2334.w200h.png'
+                },
+                {
+                    name: "Bo'Callaghan, el Trebol",
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/2549.w200h.png'
+                },
+                {
+                    name: 'Prestrit, el Luchador',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/2349.w200h.png'
+                },
+                {
+                    name: 'Cochumájer, el Rápido',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/2325.w200h.png'
+                },
+                {
+                    name: 'Tortugríssom, el Doctor',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/2298.w200h.png'
+                },
+                {
+                    name: 'Wogew Wabbit, el Engañado',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/2304.w200h.png'
+                },
+                {
+                    name: 'Pastortilla, el Huevo',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/2397.w200h.png'
+                },
+                {
+                    name: 'Jefe de Victoria Jarató, el Mancillado',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/2324.w200h.png'
+                },
+                {
+                    name: 'Colmillamoto, el Omnipotente',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/2378.w200h.png'
+                },
+                {
+                    name: 'Tortugadget, el Inspector',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/2295.w200h.png'
+                }
+            ],
+            '23': [
+                {
+                    name: 'Cuergotismo, el Febril',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/2437.w200h.png'
+                },
+                {
+                    name: 'Pischili Conkarne, el Fuerte',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/2346.w200h.png'
+                },
+                {
+                    name: 'Pischurrasco, el Braseado',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/2338.w200h.png'
+                },
+                {
+                    name: 'Pischistorra, la Cárnica',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/2340.w200h.png'
+                },
+                {
+                    name: 'Gazpischos, el Refrescante',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/2272.w200h.png'
+                },
+                {
+                    name: 'Tortugo Projatt, el Corto',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/2297.w200h.png'
+                },
+                {
+                    name: 'Maéstrick Vaggerpiro, el Canto Rodado',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/2532.w200h.png'
+                },
+                {
+                    name: 'Mazomorra, el Rolista',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/2484.w200h.png'
+                },
+                {
+                    name: 'Mililupin, el Tercero',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/2333.w200h.png'
+                },
+                {
+                    name: 'Mitoskorleone, el Buen Padre',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/2533.w200h.png'
+                },
+                {
+                    name: 'Saltolante la Gimnasta',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/4348.w200h.png'
+                },
+                {
+                    name: 'Tortruquini, el Inspector',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/2296.w200h.png'
+                },
+                {
+                    name: 'Bwhork Mageneration, el Precursor',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/2418.w200h.png'
+                },
+                {
+                    name: 'Blackowwibbit, el Imaginativo',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/2403.w200h.png'
+                },
+                {
+                    name: 'Colmillazaqui, el Inagotable',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/2440.w200h.png'
+                },
+                {
+                    name: 'Rostetricia, la Reproductiva',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/2277.w200h.png'
+                },
+                {
+                    name: 'Minerón, el Incendiario',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/2335.w200h.png'
+                },
+                {
+                    name: 'Barchwork, el Multicolor',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/2417.w200h.png'
+                }
+            ],
+            '24': [
+                {
+                    name: 'Champlomo, el Soldadito',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/2424.w200h.png'
+                },
+                {
+                    name: 'Champlin, el Cómico',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/2425.w200h.png'
+                },
+                {
+                    name: 'Champán, el Espumoso',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/2426.w200h.png'
+                },
+                {
+                    name: 'Crojmeo, el Veronés',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/2326.w200h.png'
+                },
+                {
+                    name: 'Mandreinas, las Nueve',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/2529.w200h.png'
+                },
+                {
+                    name: 'Pulgargrolito, el Astuto',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/2486.w200h.png'
+                },
+                {
+                    name: 'Dragozart Almandreus, el Prodigio',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/2379.w200h.png'
+                },
+                {
+                    name: 'Gelatina Turner, la Best',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/2376.w200h.png'
+                },
+                {
+                    name: 'Waybbit Esquelite, el Rebelde',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/2305.w200h.png'
+                },
+                {
+                    name: 'Charfernegger, el Goberneitor',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/2321.w200h.png'
+                },
+                {
+                    name: 'Crujaitor, el Eurovisivo',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/2436.w200h.png'
+                },
+                {
+                    name: 'Bwarkgner, el Magnificentista',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/2416.w200h.png'
+                },
+                {
+                    name: 'Abrakíledo, el Patas Ligeras',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/2309.w200h.png'
+                },
+                {
+                    name: 'Kramelanoma, el Ennegrecedor',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/2521.w200h.png'
+                },
+                {
+                    name: 'Escarumais, los Siete',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/2280.w200h.png'
+                },
+                {
+                    name: 'Estarausija Azul, el del Danubio',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/2281.w200h.png'
+                },
+                {
+                    name: 'Escorobeitor, el Malvado',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/2282.w200h.png'
+                },
+                {
+                    name: 'Esjaraboja Verde, el Mentolado',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/2283.w200h.png'
+                },
+                {
+                    name: 'Arib Abá, el de los 40',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/2276.w200h.png'
+                }
+            ],
+            '25': [
+                {
+                    name: 'Blómperman, el Explosivo',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/2404.w200h.png'
+                },
+                {
+                    name: 'Blop Dylan, el Ventoso',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/2405.w200h.png'
+                },
+                {
+                    name: 'Blop Inocho, el Narizotas',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/2406.w200h.png'
+                },
+                {
+                    name: 'Bloppy Reinarker, la Primera Mitad',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/2407.w200h.png'
+                },
+                {
+                    name: 'Doomba, el Inimitable',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/2408.w200h.png'
+                },
+                {
+                    name: 'Cerduodenitis, el Abdominal',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/2432.w200h.png'
+                },
+                {
+                    name: 'Escarálibur, la Legendaria',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/2615.w200h.png'
+                },
+                {
+                    name: 'Chafíner Divarrio, el Casposo',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/2421.w200h.png'
+                },
+                {
+                    name: 'Pischto, el Tomatoso',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/2339.w200h.png'
+                },
+                {
+                    name: 'Trroncky III, el Tigre',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/2299.w200h.png'
+                },
+                {
+                    name: 'Abrákneo, el Elegido',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/2385.w200h.png'
+                },
+                {
+                    name: 'Cháferlie, el Ángeles',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/2319.w200h.png'
+                },
+                {
+                    name: 'Cocodranel, la perfumada',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/2439.w200h.png'
+                },
+                {
+                    name: 'Ratokio de Alcontel, la Despeinada',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/2350.w200h.png'
+                },
+                {
+                    name: 'Scorbuthoveen, el Sordo',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/2285.w200h.png'
+                },
+                {
+                    name: 'Dragamenón, el Destructroyer',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/2465.w200h.png'
+                },
+                {
+                    name: 'Crustoriyama, el Boludo',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/2557.w200h.png'
+                },
+                {
+                    name: 'Crustodralí, el Bigotudo',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/2558.w200h.png'
+                },
+                {
+                    name: 'Crustérix, el Viajante',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/2559.w200h.png'
+                }
+            ],
+            '26': [
+                {
+                    name: 'Crusthórpal, Passian el Submarino',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/2560.w200h.png'
+                },
+                {
+                    name: 'Herranor, el Pizzaiolo',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/2328.w200h.png'
+                },
+                {
+                    name: 'Araklas Mausus, el Encofiado',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/2311.w200h.png'
+                },
+                {
+                    name: 'Abustin Pawits, el Bocasucia',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/2498.w200h.png'
+                },
+                {
+                    name: 'Wabibip Woyote, el Persistente',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/2308.w200h.png'
+                },
+                {
+                    name: 'Caballagami Pueryukazo, el Aburrido',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/2420.w200h.png'
+                },
+                {
+                    name: 'Abubanero, el Naranja',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/2384.w200h.png'
+                },
+                {
+                    name: 'Amlobdovar, el Movidista',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/2391.w200h.png'
+                },
+                {
+                    name: 'Codembolia, el Obstructor',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/2433.w200h.png'
+                },
+                {
+                    name: 'Gínsenk, el Estimulante',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/2493.w200h.png'
+                },
+                {
+                    name: 'Kiravel, el Artesano',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/2508.w200h.png'
+                },
+                {
+                    name: 'Led Empling, el Ascensorista',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/2525.w200h.png'
+                },
+                {
+                    name: 'Nelgibson, el Letal',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/2539.w200h.png'
+                },
+                {
+                    name: 'Nipultay Dea, el Poco Inspirado',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/2540.w200h.png'
+                },
+                {
+                    name: 'Osurce Kodes, el Problemático',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/2585.w200h.png'
+                },
+                {
+                    name: 'Sushij, el Makisan',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/2289.w200h.png'
+                },
+                {
+                    name: 'Kokotel, el Agitado',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/2573.w200h.png'
+                },
+                {
+                    name: 'Chaferditos, los Tres',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/2320.w200h.png'
+                },
+                {
+                    name: 'Chagüer Langers, los Coloridos',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/2322.w200h.png'
+                }
+            ],
+            '27': [
+                {
+                    name: 'Chamadkasas, las Desesperadas',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/2423.w200h.png'
+                },
+                {
+                    name: 'DoK Ok, el Gasterópodo',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/2442.w200h.png'
+                },
+                {
+                    name: "Minocontavan Konm'astuzia, el Colorado",
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/2568.w200h.png'
+                },
+                {
+                    name: 'Kokajín, el Calvo',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/2517.w200h.png'
+                },
+                {
+                    name: 'El Strat, el Vampiro',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/2616.w200h.png'
+                },
+                {
+                    name: 'El Stronyjok, el Pajarillo',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/2524.w200h.png'
+                },
+                {
+                    name: 'El Strópala Otravez, el Sam',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/2575.w200h.png'
+                },
+                {
+                    name: 'Palmiscor Pions, los Amantes',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/2582.w200h.png'
+                },
+                {
+                    name: 'Palmila, la Vigilante',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/2583.w200h.png'
+                },
+                {
+                    name: 'Palmifred Passteroh, el Bailarín',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/2584.w200h.png'
+                },
+                {
+                    name: 'Jabulio de la Llanesias, el Portero',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/2279.w200h.png'
+                },
+                {
+                    name: 'Abrakadabra, el Pata de Kabra',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/2389.w200h.png'
+                },
+                {
+                    name: 'Crujidilo Dundee, el Australiano',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/2438.w200h.png'
+                },
+                {
+                    name: "Chafernan D'alonzo, el Nano",
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/2422.w200h.png'
+                },
+                {
+                    name: 'Crujlieta, la Veronesa',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/2556.w200h.png'
+                },
+                {
+                    name: 'Maestrónomo, el Estrellado',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/2359.w200h.png'
+                },
+                {
+                    name: 'Kanábolo, el Rubio',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/2502.w200h.png'
+                },
+                {
+                    name: 'Kanníbal, el Lector',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/2507.w200h.png'
+                }
+            ],
+            '28': [
+                {
+                    name: 'Klaidíbola Cerbarrow, la Otra Mitad',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/2505.w200h.png'
+                },
+                {
+                    name: 'Kanibúlrich Lars, el Metálico',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/2506.w200h.png'
+                },
+                {
+                    name: 'Palmiró, el Tetradimensional',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/2581.w200h.png'
+                },
+                {
+                    name: 'Rafa de Alnadalillas, el Canibal',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/2273.w200h.png'
+                },
+                {
+                    name: 'Uginukem, el Duque',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/2589.w200h.png'
+                },
+                {
+                    name: 'Cortazador, el Inconformista',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/2555.w200h.png'
+                },
+                {
+                    name: 'Drugmiente, la Bella',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/2369.w200h.png'
+                },
+                {
+                    name: 'Drakaoly, la Violinista',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/2368.w200h.png'
+                },
+                {
+                    name: 'Dragstor, el de la Esquina',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/2367.w200h.png'
+                },
+                {
+                    name: 'Drajoimito, el Azul',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/2451.w200h.png'
+                },
+                {
+                    name: 'Dragump, el Oscarizado',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/2453.w200h.png'
+                },
+                {
+                    name: 'Dragrogui, el Ebrio',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/2459.w200h.png'
+                },
+                {
+                    name: 'Dragosstinho, el Futboleiro',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/2455.w200h.png'
+                },
+                {
+                    name: 'Dragoss Pel, el Negro',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/2457.w200h.png'
+                },
+                {
+                    name: 'Serpistol, el Afónico',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/2287.w200h.png'
+                },
+                {
+                    name: 'Raúl Cera, la Péptica',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/2351.w200h.png'
+                }
+            ],
+            '29': [
+                {
+                    name: 'Cañón Dorzuelo, el Doloroso',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/2419.w200h.png'
+                },
+                {
+                    name: 'Nakúmbat, el Mortal',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/2538.w200h.png'
+                },
+                {
+                    name: 'Merkxguerrita, el Ogro',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/2554.w200h.png'
+                },
+                {
+                    name: 'Dreggeatón, el Latino',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/2377.w200h.png'
+                },
+                {
+                    name: 'Dragmocles, el Fatalista',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/2372.w200h.png'
+                },
+                {
+                    name: 'Dragkuín el Magnífico',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/2450.w200h.png'
+                },
+                {
+                    name: 'Drajoanito, el Rojo',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/2449.w200h.png'
+                },
+                {
+                    name: 'Koalalia, el Mudo',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/2513.w200h.png'
+                },
+                {
+                    name: 'Koalugok, el Pato',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/2516.w200h.png'
+                },
+                {
+                    name: 'Koalako, el Pato',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/2509.w200h.png'
+                },
+                {
+                    name: 'Koaluik, el Pato',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/2518.w200h.png'
+                },
+                {
+                    name: 'Ratila, el Huno',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/2275.w200h.png'
+                },
+                {
+                    name: 'Sparito, el Feo',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/2588.w200h.png'
+                },
+                {
+                    name: 'Fantasmarley, el Rastafari',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/2466.w200h.png'
+                },
+                {
+                    name: 'Fanthraks, el Acomplejado',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/2467.w200h.png'
+                },
+                {
+                    name: 'Fantasma Arepopins, la Niñera',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/2563.w200h.png'
+                },
+                {
+                    name: 'Fantastle Vániante, el Matavampiros',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/2468.w200h.png'
+                },
+                {
+                    name: 'Barbrétzel, el Salado',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/2545.w200h.png'
+                },
+                {
+                    name: 'Nieruba, el Poeta',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/2579.w200h.png'
+                }
+            ],
+            '30': [
+                {
+                    name: 'Jefe Cocolumbo, el Detective',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/2428.w200h.png'
+                },
+                {
+                    name: 'Tufóbico, el Miedoso',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/2547.w200h.png'
+                },
+                {
+                    name: 'Crujíbaro, el Tzantza',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/2561.w200h.png'
+                },
+                {
+                    name: 'Onistérico el Desenfrenado',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/4457.w200h.png'
+                },
+                {
+                    name: 'Sakkado la Transportista',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/4459.w200h.png'
+                },
+                {
+                    name: 'Kaenekfeu el Parlanchín',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/4461.w200h.png'
+                },
+                {
+                    name: 'Nanashi el Virtuoso',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/4463.w200h.png'
+                },
+                {
+                    name: 'Marude la Enarenada',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/4465.w200h.png'
+                },
+                {
+                    name: 'Kánudalf, el Kanoso',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/2503.w200h.png'
+                },
+                {
+                    name: 'Munchfavard, el Gritador',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/2580.w200h.png'
+                },
+                {
+                    name: 'Miluigi, el Fontanero',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/2337.w200h.png'
+                },
+                {
+                    name: 'Kidoloroso, del Calmante',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/2571.w200h.png'
+                },
+                {
+                    name: 'Kílibrill vol.2, el Vengativo',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/2572.w200h.png'
+                },
+                {
+                    name: 'Drageagainst, el Máquina',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/2448.w200h.png'
+                },
+                {
+                    name: 'Draltóniko, el Ojo de Águila',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/2447.w200h.png'
+                },
+                {
+                    name: 'Dragma, el Griego',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/2446.w200h.png'
+                },
+                {
+                    name: 'Drajorgito, el Verde',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/2445.w200h.png'
+                },
+                {
+                    name: 'Mafaldragosa, la Hermana pequeña',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/2461.w200h.png'
+                },
+                {
+                    name: 'Guerred-Fish, el Cortés',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/2497.w200h.png'
+                }
+            ],
+            '31': [
+                {
+                    name: 'Arakazam la Psíquica',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/4346.w200h.png'
+                },
+                {
+                    name: 'Warkamole, el Apetitoso',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/2306.w200h.png'
+                },
+                {
+                    name: 'Abrakeponerse, el Optimista',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/2388.w200h.png'
+                },
+                {
+                    name: 'Sepaulturero Kleealak, el Arquitecto',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/2482.w200h.png'
+                },
+                {
+                    name: 'Zampatávoro, el Miliano',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/2495.w200h.png'
+                },
+                {
+                    name: 'Koalúkyluk, el Solitario',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/2515.w200h.png'
+                },
+                {
+                    name: 'Peketchup, el Hamburguesero',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/2271.w200h.png'
+                },
+                {
+                    name: 'Piralhaka, el Maorí',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/2270.w200h.png'
+                },
+                {
+                    name: 'Ábrakin, el Oscuro',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/2386.w200h.png'
+                },
+                {
+                    name: 'Botalak Cabalgator, el Ingenioso',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/2429.w200h.png'
+                },
+                {
+                    name: 'Mospetero, el Triple',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/2577.w200h.png'
+                },
+                {
+                    name: 'Drakójak, el Piruletas',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/2464.w200h.png'
+                },
+                {
+                    name: 'Dreghouse, el Cínico',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/2452.w200h.png'
+                },
+                {
+                    name: 'Diszápulo Delzoih, el Profeta',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/2562.w200h.png'
+                },
+                {
+                    name: 'Esquenosé, el Indeciso',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/2550.w200h.png'
+                },
+                {
+                    name: 'Tofofo, el Blandito',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/2546.w200h.png'
+                }
+            ],
+            '32': [
+                {
+                    name: 'Dientetris, el Inolvidable',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/2360.w200h.png'
+                },
+                {
+                    name: 'Florivera, el Muralista',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/2565.w200h.png'
+                },
+                {
+                    name: 'Koelloks, el Cerealista',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/2519.w200h.png'
+                },
+                {
+                    name: 'Koayak, el Destripador',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/2514.w200h.png'
+                },
+                {
+                    name: 'Mamoon, el Grande',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/2528.w200h.png'
+                },
+                {
+                    name: 'Momíller Frának, el Umbrío',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/2534.w200h.png'
+                },
+                {
+                    name: 'Lodontólogo, el Sonriente',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/2363.w200h.png'
+                },
+                {
+                    name: 'Warjamer, el Miniaturista',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/2307.w200h.png'
+                },
+                {
+                    name: 'Chavala Zotaina, la Castigadora',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/2566.w200h.png'
+                },
+                {
+                    name: 'Guerreynor Zothia, la Superviviente',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/2569.w200h.png'
+                },
+                {
+                    name: 'Barrostroporosis, el Frágil',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/2361.w200h.png'
+                },
+                {
+                    name: 'Abrajinieves, el Enanito',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/2544.w200h.png'
+                },
+                {
+                    name: 'Dragoss&Dungeoss, el Original',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/2454.w200h.png'
+                },
+                {
+                    name: 'Ledrag, el Ognat',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/2460.w200h.png'
+                },
+                {
+                    name: 'Dragoss To, el Caluroso',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/2456.w200h.png'
+                },
+                {
+                    name: 'Dragore, el Sangriento',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/2458.w200h.png'
+                },
+                {
+                    name: 'Drakolakao, el Sabroso',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/2462.w200h.png'
+                },
+                {
+                    name: 'Siegálaher, los Chulos',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/2567.w200h.png'
+                }
+            ],
+            '33': [
+                {
+                    name: 'Maestro Peado, la Cuenta',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/2531.w200h.png'
+                },
+                {
+                    name: 'Pohozí, el Jorobado',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/2383.w200h.png'
+                },
+                {
+                    name: 'Troolbin, el de los Bolsquels',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/2300.w200h.png'
+                },
+                {
+                    name: 'Sargende Michael, el Narrador',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/2587.w200h.png'
+                },
+                {
+                    name: 'Kasrafantásol, el Parapsicólogo',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/2570.w200h.png'
+                },
+                {
+                    name: 'Tufaldo Aréneo, el Marielito',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/2382.w200h.png'
+                },
+                {
+                    name: 'Abroesidor, el Navegante',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/2381.w200h.png'
+                },
+                {
+                    name: 'Don Kizoth, el Obstinado',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/2578.w200h.png'
+                },
+                {
+                    name: 'Champacné, el Granitos',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/2553.w200h.png'
+                },
+                {
+                    name: 'Trompsosis, el Cardiaco',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/2601.w200h.png'
+                },
+                {
+                    name: 'Champli, el Sonoro',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/2552.w200h.png'
+                },
+                {
+                    name: 'Chalbis, el King',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/2373.w200h.png'
+                },
+                {
+                    name: "Setsa'n Desiti, la Amistosa",
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/2551.w200h.png'
+                },
+                {
+                    name: 'Setal Slugdor, el Exterminador',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/2600.w200h.png'
+                },
+                {
+                    name: 'Dárdamel la Secuestradora',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/4352.w200h.png'
+                },
+                {
+                    name: 'Arafernalia la Calígrafa',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/4354.w200h.png'
+                }
+            ],
+            '34': [
+                {
+                    name: 'Reyuna, el Dibujante',
+                    url: 'https://static.ankama.com/dofus-touch/www/game/monsters/200/2614.w200h.png'
+                }
+            ],
+            '35': []
+        }
+            ;
+
+        let capturedItems = {}; // Stores captured status for each monster name
+        let searchTerm = ''; // Current search term
+
+        /**
+         * Loads captured items from local storage.
+         */
+        function loadCapturedItems() {
+            try {
+                const storedItems = localStorage.getItem('capturedMonsters');
+                if (storedItems) {
+                    capturedItems = JSON.parse(storedItems);
+                }
+            } catch (error) {
+                console.error("Error loading captured monsters from local storage:", error);
+                // Fallback to empty object if storage is corrupted
+                capturedItems = {};
+            }
+        }
+
+        /**
+         * Saves current captured items to local storage.
+         */
+        function saveCapturedItems() {
+            try {
+                localStorage.setItem('capturedMonsters', JSON.stringify(capturedItems));
+            } catch (error) {
+                console.error("Error saving captured monsters to local storage:", error);
+            }
+        }
+
+        /**
+         * Toggles the captured status of a single monster.
+         * @param {string} itemName - The name of the monster.
+         */
+        function toggleCapture(itemName) {
+            capturedItems[itemName] = !capturedItems[itemName];
+            saveCapturedItems();
+            renderMonsters(); // Re-render to update UI
+        }
+
+        /**
+         * Toggles the captured status for all visible (filtered) monsters within a specific etapa.
+         * @param {string} etapaKey - The key of the etapa (e.g., '1', '2').
+         * @param {boolean} forceState - Optional. If provided, forces all monsters to this state (true=captured, false=uncaptured).
+         */
+        function toggleEtapa(etapaKey, forceState = undefined) {
+            const etapaMonsters = initialData[etapaKey];
+            const filteredEtapaMonsters = etapaMonsters.filter(item =>
+                item.name.toLowerCase().includes(searchTerm.toLowerCase())
+            );
+
+            // Determine target state: if forceState is provided, use it. Otherwise, toggle based on current state.
+            const allCapturedInEtapa = filteredEtapaMonsters.every(item => capturedItems[item.name]);
+            const targetState = forceState !== undefined ? forceState : !allCapturedInEtapa;
+
+            filteredEtapaMonsters.forEach(item => {
+                capturedItems[item.name] = targetState;
+            });
+
+            saveCapturedItems();
+            renderMonsters(); // Re-render to update UI
+        }
+
+        /**
+         * Updates the captured monsters counter display.
+         */
+        function updateCapturedCounter() {
+            const counterElement = document.getElementById('capturedCounter');
+            let totalMonsters = 0;
+            for (const etapaKey in initialData) {
+                totalMonsters += initialData[etapaKey].length;
+            }
+
+            let capturedCount = 0;
+            for (const itemName in capturedItems) {
+                if (capturedItems[itemName]) {
+                    capturedCount++;
+                }
+            }
+            counterElement.textContent = `${capturedCount}/${totalMonsters} monstruos capturados`;
+        }
+
+        /**
+         * Renders the monsters into the accordion based on the current search term and captured status.
+         */
+        function renderMonsters() {
+            const accordionContainer = document.getElementById('monsterAccordion');
+            accordionContainer.innerHTML = ''; // Clear existing content
+
+            // Filter data based on search term
+            const filteredData = {};
+            for (const etapaKey in initialData) {
+                filteredData[etapaKey] = initialData[etapaKey].filter(item =>
+                    item.name.toLowerCase().includes(searchTerm.toLowerCase())
+                );
+            }
+
+            // Iterate over each etapa
+            for (const etapaKey of Object.keys(initialData)) {
+                const currentFilteredMonsters = filteredData[etapaKey];
+
+                // If searching and this etapa is empty after filtering, skip rendering it
+                if (searchTerm !== '' && currentFilteredMonsters.length === 0) {
+                    continue;
+                }
+
+                // Check if all filtered monsters in this etapa are currently captured
+                const allCurrentFilteredCaptured = currentFilteredMonsters.length > 0 && currentFilteredMonsters.every(item => capturedItems[item.name]);
+
+                const accordionItemId = `collapse${etapaKey}`;
+                const headingId = `heading${etapaKey}`;
+                const etapaGridId = `etapaGrid${etapaKey}`;
+                const checkboxId = `etapaToggle${etapaKey}`;
+
+                // Accordions are always shown and expanded by default
+                const collapseClasses = 'collapse show';
+                const ariaExpanded = 'true';
+
+                const accordionItem = document.createElement('div');
+                accordionItem.className = 'accordion-item';
+
+                accordionItem.innerHTML = `
+                    <h2 class="accordion-header" id="${headingId}">
+                        <button class="accordion-button" type="button" data-bs-toggle="collapse" data-bs-target="#${accordionItemId}" aria-expanded="${ariaExpanded}" aria-controls="${accordionItemId}">
+                            Etapa ${etapaKey}
+                            <div class="form-check form-switch etapa-toggle-switch">
+                                <input class="form-check-input etapa-toggle-input" type="checkbox" role="switch" id="${checkboxId}" data-etapa-key="${etapaKey}" ${allCurrentFilteredCaptured ? 'checked' : ''}>
+                                <label class="form-check-label visually-hidden" for="${checkboxId}">Marcar/Desmarcar todos en Etapa ${etapaKey}</label>
+                            </div>
+                        </button>
+                    </h2>
+                    <div id="${accordionItemId}" class="${collapseClasses}" aria-labelledby="${headingId}" data-bs-parent="#monsterAccordion">
+                        <div class="accordion-body">
+                            <div class="row row-cols-2 row-cols-sm-3 row-cols-md-4 g-3" id="${etapaGridId}">
+                                <!-- Monster cards will be appended here -->
+                            </div>
+                            ${currentFilteredMonsters.length === 0 ? `<p class="text-center text-muted py-3">No hay monstruos para esta Etapa con el término de búsqueda actual.</p>` : ''}
+                        </div>
+                    </div>
+                `;
+                accordionContainer.appendChild(accordionItem);
+
+                // Populate the grid for the current etapa
+                const etapaGrid = accordionItem.querySelector(`#${etapaGridId}`);
+                if (etapaGrid) {
+                    currentFilteredMonsters.forEach(item => {
+                        const isCaptured = !!capturedItems[item.name];
+                        const cardDiv = document.createElement('div');
+                        cardDiv.className = `col`;
+                        cardDiv.innerHTML = `
+                            <div class="monster-card ${isCaptured ? 'captured' : ''}" data-item-name="${item.name}">
+                                <img src="${item.url}" alt="${item.name}" onerror="this.onerror=null;this.src='https://placehold.co/100x100/aaaaaa/ffffff?text=No+Img';" />
+                                <span class="name">${item.name}</span>
+                            </div>
+                        `;
+                        etapaGrid.appendChild(cardDiv);
+                    });
+                }
+            }
+
+            // Update the captured monsters counter after rendering everything
+            updateCapturedCounter();
+            // Attach event listeners after rendering
+            attachEventListeners();
+        }
+
+        /**
+         * Attaches event listeners to dynamically created elements.
+         * Uses event delegation for monster cards and etapa toggle checkboxes.
+         */
+        function attachEventListeners() {
+            const accordionContainer = document.getElementById('monsterAccordion');
+            const searchInput = document.getElementById('searchTerm');
+
+            // Clear previous listeners to prevent duplicates (important for re-rendering)
+            accordionContainer.removeEventListener('click', handleAccordionClick);
+            searchInput.removeEventListener('input', handleSearchInput);
+
+            // Add new listeners
+            accordionContainer.addEventListener('click', handleAccordionClick);
+            searchInput.addEventListener('input', handleSearchInput);
+        }
+
+        /**
+         * Handles clicks on the accordion container, delegating to monster cards and etapa toggles.
+         * @param {Event} event - The click event.
+         */
+        function handleAccordionClick(event) {
+            const monsterCard = event.target.closest('.monster-card');
+            if (monsterCard) {
+                const itemName = monsterCard.dataset.itemName;
+                if (itemName) {
+                    toggleCapture(itemName);
+                }
+            }
+
+            // Handle the etapa toggle switch click
+            const etapaToggleInput = event.target.closest('input[type="checkbox"][data-etapa-key]');
+            if (etapaToggleInput) {
+                // Prevent the accordion header from collapsing/expanding when clicking the switch
+                event.stopPropagation();
+                const etapaKey = etapaToggleInput.dataset.etapaKey;
+                // The checked state of the input itself determines the target state
+                toggleEtapa(etapaKey, etapaToggleInput.checked);
+            }
+        }
+
+        /**
+         * Handles input changes in the search bar.
+         * @param {Event} event - The input event.
+         */
+        function handleSearchInput(event) {
+            searchTerm = event.target.value.trim();
+            renderMonsters(); // Re-render on search input change
+        }
+
+        // Initialize on DOMContentLoaded
+        document.addEventListener('DOMContentLoaded', () => {
+            loadCapturedItems();
+            renderMonsters(); // Initial render
+        });
+    </script>
+</body>
+
+</html>
